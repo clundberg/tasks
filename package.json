@@ -1,0 +1,19 @@
+{
+  "author": "Frakture, Inc",
+  "name": "frakture-tasks",
+  "description": "Node.js task management libraries & Express API's with data storage in Mongo",
+  "keywords":["task","workflow","process","mongo"],
+  "version": "0.1.0",
+  "homepage":"https://github.com/frakture/tasks",
+  "repository" :
+             { "type" : "git"
+             , "url" : "https://github.com/frakture/tasks.git"
+             },
+  "main": "./lib/main",
+  "dependencies":{
+	 "mongoskin":">=0.5.0"
+  },
+  "devDependencies":{
+  	"hogan.js":">=2.0.0"
+  }
+}
