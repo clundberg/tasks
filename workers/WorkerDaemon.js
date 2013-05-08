@@ -2,12 +2,13 @@
 	WorkerDaemon waits for tasks, constructs a task, 
 		then spawns the appropriate library and processes the task
 */
+if (!process.env.MONGO_URI) throw "MONGO_URI environment variable is required";
 
-var mongo_util=require("./lib/mongo_util.js"), file_util=require("./lib/file_util.js");
-var db=require('mongoskin').db(process.env.MONGOLAB_URI,{safe:true});
+var mongo_util=require("../lib/mongo_util.js"), file_util=require("../lib/file_util.js");
+var db=require('mongoskin').db(process.env.MONGO_URI,{safe:true});
 
 var campaignCollection=db.collection("campaign");
-var Task=require("./Task.js");
+var Task=require("../Task.js");
 
 var WorkerDaemon=function(opts){
 	opts=opts ||{};

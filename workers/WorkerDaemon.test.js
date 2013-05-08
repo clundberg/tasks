@@ -1,5 +1,6 @@
+console.log("Starting test");
 var WorkerDaemon=require("./WorkerDaemon.js"),
-	db=require('mongoskin').db(process.env.MONGOLAB_URI,{safe:true});
+	db=require('mongoskin').db(process.env.MONGO_URI,{safe:true});
 	
 var tasks=[
 {
@@ -55,17 +56,27 @@ var tasks=[
  db.createCollection("worker_daemon_test_tasks", {capped:true, size:100000});
  db.worker_daemon_test_tasks.save({});
  */
+
 var collectionName="worker_daemon_test_tasks";
 
-//at least one record is required, otherwise the tailable cursor doesn't work
-var coll=db.collection(collectionName);
+ if (db.collection(collectionName))db.collection(collectionName).drop(function(err){if (err) throw err;});
+ 
+ db.createCollection(collectionName, {capped:true, size:10000,max:1000, w:1},function(err, cb){
+ 	if (err) throw err;
+ 	var coll=db.collection(collectionName);
+	//at least one record is required, otherwise the tailable cursor doesn't work
+ 	coll.save({},function(err){if (err) throw err;});
 
-var TestWorker=new WorkerDaemon({collection:coll});
-TestWorker.start();
 
-tasks.forEach(function(task){
-	coll.save(task,function(err){
-		if (err) throw err;
+	var TestWorker=new WorkerDaemon({collection:coll});
+	TestWorker.start();
+
+	tasks.forEach(function(task){
+		coll.save(task,function(err){
+			if (err) throw err;
+		});
 	});
-});
 
+ 	
+ });
+ 
