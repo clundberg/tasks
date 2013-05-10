@@ -1,5 +1,5 @@
 /****** Worker boilerplate *******/
-var util = require('util'),	js_util=require('../../lib/js_util.js'),Worker = require('../../Worker.js');
+var util = require('util'),	js_util=require('../../lib/js_util.js'),Worker = require('../Worker.js');
 function WorkerImpl() {
   Worker.call(this);
 }
@@ -20,8 +20,8 @@ WorkerImpl.prototype.getFormHints=function(){
 
 WorkerImpl.prototype._update=function(task,options){
 	options=options ||{};
-	console.log("Dummy: this="+JSON.stringify(this));
-	console.log("Options="+JSON.stringify(options));
+	console.log("DummyMessage: this="+JSON.stringify(this));
+	console.log("DummyMessage:Options="+JSON.stringify(options));
 	console.log(task);
 	this.url="http://dummy-url/";
 	this.content=js_util.extend(this.content || {},options.content);
