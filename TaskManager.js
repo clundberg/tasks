@@ -44,7 +44,7 @@ filters  {
 
 */
 
-var mongo_util=require("../lib/mongo_util.js");
+var mongo_util=require("./lib/mongo_util.js");
 var db=require('mongoskin').db(process.env.MONGO_URI,{safe:true});
 
 /*
@@ -63,7 +63,7 @@ var TaskManager=function(opts){
 }
 
 
-TaskManager.prototype.load(task,callback){
+TaskManager.prototype.load=function(task,callback){
 	if (typeof task=='object'){
 		callback(task);
 	}else{
@@ -75,14 +75,26 @@ TaskManager.prototype.load(task,callback){
 	}
 }
 
-TaskManager.prototype._save(task,callback){
+TaskManager.prototype.create=function(task,callback){
+	task.status='new';
+	task.created_at=new Date();
+	this.taskCollection.save(task,function(){
+		this.auditCollection.save({ts:new Date(), task_id:task._id, status:task.status,task:task},function(err){
+				if (err) throw err;
+				if (callback) callback(task);
+			});
+	});
+}
+
+
+TaskManager.prototype._update=function(task,callback){
 	this.loadTask(task,function(task){
 		task.modified_at=new Date();
 		if (task.completed && !task.completed_at) task.completed_at=task.modified_at;
 		this.taskCollection.save(task,function(err){
 			if (err) throw err;
 			
-			auditCollection.save({ts:new Date(), task_id:task._id, status:task.status,task:task},function(err){
+			this.auditCollection.save({ts:new Date(), task_id:task._id, status:task.status,task:task},function(err){
 				if (err) throw err;
 				if (callback) callback(task);
 			});
@@ -96,7 +108,7 @@ TaskManager.prototype.error=function(task,message,callback){
 	this.loadTask(task,function(task){
 		task.status='error';
 		task.error_message=message;
-		this._save(task,callback);
+		this._update(task,callback);
 	}) ;
 }
 
@@ -107,7 +119,7 @@ TaskManager.prototype.complete=function(task,callback){
 	this.loadTask(task,function(task){
 		task.status='complete';
 		delete task.completed_at;
-		this._save(task,callback);
+		this._update(task,callback);
 	});
 }
 
@@ -117,7 +129,7 @@ TaskManager.prototype.assign=function(task,assignee,callback){
 		task.status='assigned';
 		task.assignee=assignee;
 		task.assignee_status='inbox';
-		this._save(task,callback);
+		this._update(task,callback);
 	});
 }
 

@@ -60,31 +60,45 @@ var tasks=[
  */
 
 var taskCollection="worker_daemon_test_tasks";
-
 var persistenceCollection="worker_daemon_test_persistence";
+var auditCollection="worker_daemon_test_audit";
 
- if (db.collection(taskCollection))db.collection(taskCollection).drop(function(err){if (err) throw err;});
- 
- db.createCollection(taskCollection, {capped:true, size:10000,max:1000, w:1},function(err, cb){
- 	if (err) throw err;
- 	var coll=db.collection(taskCollection);
-	//at least one record is required, otherwise the tailable cursor doesn't work
- 	coll.save({},function(err){if (err) throw err;});
- 	
- 	var persistenceColl=db.collection(persistenceCollection);
- 	var obj={};
- 	persistenceColl.save(obj,function(){
-		var TestWorker=new WorkerDaemon({task_collection:coll,persistence_collection:persistence}) ;
-		TestWorker.start();
+function resetCollection(name,opts,callback){
+	 
+	 db.collection(name).drop(function(err){
+		 db.createCollection(name, opts || {},function(err, cb){
+			if (err) throw err;
+			callback();
+		});	 
+	 });
+	 
+	 
+	 
+}
 
-		tasks.forEach(function(task){
-			task.persistence_id=obj._id;
-			coll.save(task,function(err){
-				if (err) throw err;
+resetCollection(taskCollection,{},function(){
+	resetCollection(auditCollection,{capped:true, size:10000,max:1000},function(){
+		resetCollection(persistenceCollection,{},function(){
+		
+		 	var auditColl=db.collection(auditCollection);
+				//at least one record is required, otherwise the tailable cursor doesn't work
+				auditColl.save({},function(err){if (err) throw err;});
+	
+				var persistenceColl=db.collection(persistenceCollection);
+				var obj={};
+				persistenceColl.save(obj,function(){
+					var TestWorker=new WorkerDaemon({task_collection:taskCollection,persistence_collection:persistenceColl,audit_collection:auditColl});
+					TestWorker.start();
+					taskColl=db.collection(taskCollection);
+
+					tasks.forEach(function(task){
+						task.persistence_id=obj._id;
+						taskColl.save(task,function(err){
+							if (err) throw err;
+						});
+					});
+				});
 			});
 		});
-	}
+});
 
- 	
- });
- 

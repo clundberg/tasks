@@ -25,7 +25,7 @@ var WorkerDaemon=function(opts){
 		this.persistenceCollection=(typeof opts.audit_collection=='string')?db.collection(opts.persistence_collection):opts.persistence_collection;
 	}
 	
-	this.taskManager=require("../TaskManager.js");
+	this.TaskManager=new (require("../TaskManager.js"))(opts);
 	
 	this.q={};
 	if (opts.q){
@@ -56,30 +56,31 @@ function executeTask(task,persistenceObject,callback){
 
 WorkerDaemon.prototype.start=function(){
 		console.log("Worker daemon starting to read tasks.....");
+		var that=this;
 		this.auditCollection.find(this.q, {'tailable': 1, 'sort': [['$natural', 1]]}, function(err, cursor) {
 			if (!cursor) return;
-			cursor.each(function(err, task_data) {
+			cursor.each(function(err, audit_data) {
 				if (err) throw err;
-				if (!task_data) return;
-				TaskManager.load(task.task_id,function(task){
-					if (!task.assignee){return task.error("No assignee for task");}
-					if (typeof task.assignee!='object'){return task.error("Assignee is not an object");}
-					if (!task.assignee.library) return task.error("A library parameter is required for a task assignee");
-					if (!task.assignee.method) return task.error("A method parameter is required for a task assignee");
+				if (!audit_data) return;
+				that.TaskManager.load(audit_data.task_id,function(task){
+					if (!task.assignee){return TaskManager.error(task,"No assignee for task");}
+					if (typeof task.assignee!='object'){return TaskManager.error(task,"Assignee is not an object");}
+					if (!task.assignee.library) return TaskManager.error(task,"A library parameter is required for a task assignee");
+					if (!task.assignee.method) return TaskManager.error(task,"A method parameter is required for a task assignee");
 					try{
 						file_util.validateFilename(task.assignee.library);
 					}catch(e){
-						return task.error("Invalid library name");
+						return TaskManager.error(task,"Invalid library name");
 					}
 				
 					if (task_data.persistence_id && persistenceCollection){
 						executeTask(task);
 					}else{
-						persistenceCollection.findOne(mongo_util.getObjectID(task_data.persistence_id),function(err,persistenceObject){
+						that.persistenceCollection.findOne(mongo_util.getObjectID(task_data.persistence_id),function(err,persistenceObject){
 							if (err){return task.error(err);}
-							if (!persistenceObject){return task.error("Could not find persistence");}
+							if (!persistenceObject){return TaskManager.error(task,"Could not find persistence");}
 							executeTask(task,persistenceObject,function(modifiedObject){
-								persistenceCollection.save(modifiedObject,function(err){
+								that.persistenceCollection.save(modifiedObject,function(err){
 									if (err){
 										//This isn't just a TASK error, this is a fundamental problem
 										console.error("ERROR:  Problem saving persistence object");
