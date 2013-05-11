@@ -20,6 +20,7 @@ var WorkerDaemon=function(opts){
 	opts=opts ||{};
 	this.taskCollection=(typeof opts.task_collection=='string')?db.collection(opts.task_collection):opts.task_collection;
 	this.auditCollection=(typeof opts.audit_collection=='string')?db.collection(opts.audit_collection):opts.audit_collection;
+	console.log(this.auditCollection);
 	
 	if (opts.persistence_collection){
 		this.persistenceCollection=(typeof opts.audit_collection=='string')?db.collection(opts.persistence_collection):opts.persistence_collection;
@@ -38,8 +39,9 @@ function executeTask(task,persistenceObject,callback){
 		if (persistenceObject && typeof options=='function'){
 			options=options.call(persistenceObject);
 		}
-	
+		
 		var workerDef=require("./"+task.assignee.library);
+		
 	
 		var worker=new workerDef();
 		//Optional -- a task can specify a context_id that will allow other tasks to find it
@@ -61,16 +63,19 @@ WorkerDaemon.prototype.start=function(){
 			if (!cursor) return;
 			cursor.each(function(err, audit_data) {
 				if (err) throw err;
+				
 				if (!audit_data) return;
+				if (!audit_data.task_id) return;
+				
 				that.TaskManager.load(audit_data.task_id,function(task){
-					if (!task.assignee){return TaskManager.error(task,"No assignee for task");}
-					if (typeof task.assignee!='object'){return TaskManager.error(task,"Assignee is not an object");}
-					if (!task.assignee.library) return TaskManager.error(task,"A library parameter is required for a task assignee");
-					if (!task.assignee.method) return TaskManager.error(task,"A method parameter is required for a task assignee");
+					if (!task.assignee){return that.TaskManager.error(task,"No assignee for task");}
+					if (typeof task.assignee!='object'){return that.TaskManager.error(task,"Assignee is not an object");}
+					if (!task.assignee.library) return that.TaskManager.error(task,"A library parameter is required for a task assignee");
+					if (!task.assignee.method) return that.TaskManager.error(task,"A method parameter is required for a task assignee");
 					try{
 						file_util.validateFilename(task.assignee.library);
 					}catch(e){
-						return TaskManager.error(task,"Invalid library name");
+						return that.TaskManager.error(task,"Invalid library name");
 					}
 				
 					if (task_data.persistence_id && persistenceCollection){
@@ -78,7 +83,7 @@ WorkerDaemon.prototype.start=function(){
 					}else{
 						that.persistenceCollection.findOne(mongo_util.getObjectID(task_data.persistence_id),function(err,persistenceObject){
 							if (err){return task.error(err);}
-							if (!persistenceObject){return TaskManager.error(task,"Could not find persistence");}
+							if (!persistenceObject){return that.TaskManager.error(task,"Could not find persistence");}
 							executeTask(task,persistenceObject,function(modifiedObject){
 								that.persistenceCollection.save(modifiedObject,function(err){
 									if (err){

@@ -57,9 +57,8 @@ var TaskManager=function(opts){
 	if (!opts.task_collection) throw "TaskManager: task_collection is a required option";
 	if (!opts.audit_collection) throw "TaskManager: audit_collection is a required option";
 
-	this.taskCollection=(typeof opts.task_collection=='string')?db.collection(opts.collection):opts.collection;
-
-	this.auditCollection=(typeof opts.audit_collection=='string')?db.collection(opts.collection):opts.collection;
+	this.taskCollection=(typeof opts.task_collection=='string')?db.collection(opts.task_collection):opts.task_collection;
+	this.auditCollection=(typeof opts.audit_collection=='string')?db.collection(opts.audit_collection):opts.audit_collection;
 }
 
 
@@ -69,7 +68,7 @@ TaskManager.prototype.load=function(task,callback){
 	}else{
 		this.taskCollection.findOne({_id:mongo_util.getObjectID(task)},function(err,task){
 			if (err) throw err;
-			if (!task) throw "Could not find task "+task;
+			if (!task) throw new Error("Could not find task "+task);
 			callback(task);
 		});
 	}
@@ -78,8 +77,9 @@ TaskManager.prototype.load=function(task,callback){
 TaskManager.prototype.create=function(task,callback){
 	task.status='new';
 	task.created_at=new Date();
-	this.taskCollection.save(task,function(){
-		this.auditCollection.save({ts:new Date(), task_id:task._id, status:task.status,task:task},function(err){
+	var that=this;
+	that.taskCollection.save(task,function(){
+		that.auditCollection.save({ts:new Date(), task_id:task._id, status:task.status,task:task},function(err){
 				if (err) throw err;
 				if (callback) callback(task);
 			});
@@ -88,13 +88,14 @@ TaskManager.prototype.create=function(task,callback){
 
 
 TaskManager.prototype._update=function(task,callback){
-	this.loadTask(task,function(task){
+	var that=this;
+	this.load(task,function(task){
 		task.modified_at=new Date();
 		if (task.completed && !task.completed_at) task.completed_at=task.modified_at;
-		this.taskCollection.save(task,function(err){
+		that.taskCollection.save(task,function(err){
 			if (err) throw err;
 			
-			this.auditCollection.save({ts:new Date(), task_id:task._id, status:task.status,task:task},function(err){
+			that.auditCollection.save({ts:new Date(), task_id:task._id, status:task.status,task:task},function(err){
 				if (err) throw err;
 				if (callback) callback(task);
 			});
@@ -105,10 +106,11 @@ TaskManager.prototype._update=function(task,callback){
 
 /* Mark a task as errored */
 TaskManager.prototype.error=function(task,message,callback){
-	this.loadTask(task,function(task){
+	var that=this;
+	this.load(task,function(task){
 		task.status='error';
 		task.error_message=message;
-		this._update(task,callback);
+		that._update(task,callback);
 	}) ;
 }
 
@@ -116,20 +118,22 @@ TaskManager.prototype.error=function(task,message,callback){
 	Mark a task as completed
 */
 TaskManager.prototype.complete=function(task,callback){
-	this.loadTask(task,function(task){
+	var that=this;
+	this.load(task,function(task){
 		task.status='complete';
 		delete task.completed_at;
-		this._update(task,callback);
+		that._update(task,callback);
 	});
 }
 
 //Assign a person to accomplish this task
 TaskManager.prototype.assign=function(task,assignee,callback){
-	this.loadTask(task,function(task){
+	var that=this;
+	this.load(task,function(task){
 		task.status='assigned';
 		task.assignee=assignee;
 		task.assignee_status='inbox';
-		this._update(task,callback);
+		that._update(task,callback);
 	});
 }
 

@@ -93,9 +93,7 @@ resetCollection(taskCollection,{},function(){
 
 					tasks.forEach(function(task){
 						task.persistence_id=obj._id;
-						taskColl.save(task,function(err){
-							if (err) throw err;
-						});
+						TestWorker.TaskManager.create(task);
 					});
 				});
 			});
