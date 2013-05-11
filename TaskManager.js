@@ -47,7 +47,11 @@ filters  {
 var mongo_util=require("../lib/mongo_util.js");
 var db=require('mongoskin').db(process.env.MONGO_URI,{safe:true});
 
-
+/*
+	Takes 2 collections -- 
+		task_collection -- collection to find tasks in
+		audit_collection -- collection to record audit history in
+*/
 var TaskManager=function(opts){
 	opts=opts ||{};
 	if (!opts.task_collection) throw "TaskManager: task_collection is a required option";
@@ -78,7 +82,7 @@ TaskManager.prototype._save(task,callback){
 		this.taskCollection.save(task,function(err){
 			if (err) throw err;
 			
-			auditCollection.save({ts:new Date(), task_id:task._id, status:task.status},function(err){
+			auditCollection.save({ts:new Date(), task_id:task._id, status:task.status,task:task},function(err){
 				if (err) throw err;
 				if (callback) callback(task);
 			});
@@ -95,7 +99,6 @@ TaskManager.prototype.error=function(task,message,callback){
 		this._save(task,callback);
 	}) ;
 }
-
 
 /*
 	Mark a task as completed
