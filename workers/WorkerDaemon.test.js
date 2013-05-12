@@ -2,21 +2,35 @@ console.log("Starting test");
 var WorkerDaemon=require("./WorkerDaemon.js"),
 	db=require('mongoskin').db(process.env.MONGO_URI,{safe:true}),
 	async=require("async");
-	
-	
+
+var taskCollection="worker_daemon_test_tasks";
+var persistenceCollection="worker_daemon_test_persistence";
+var auditCollection="worker_daemon_test_audit";
+
+
 var tasks=[
 {
 	label:"Create code",
 	assignee:{
-		library:"CommonTaskWorker.js",
+		type:"module",
+		module:"CommonTaskWorker.js",
 		method:"extendContext"
 	},
-	persistence_property:"codes",
+	persistence:{
+		collection:persistenceCollection,
+		property:"codes"
+	},
 	options:{campaign_code:"2013-04-01"}
 },
-{label:"Create TAF",  persistence_property:"taf", 
+{
+	label:"Create TAF", 
+	persistence:{
+		collection:persistenceCollection,
+		property:"taf"
+	},
 	assignee:{
-		library:"dummy/DummyMessage.js", 
+		type:"module",
+		module:"dummy/DummyMessage.js", 
 		method:"create"
 	},
 	options:function(){
@@ -27,10 +41,16 @@ var tasks=[
 	  }
 	},this);
  	}
- },
-{label:"Create Email", persistence_property:"email1", 
+},
+{
+	label:"Create Email",
+	persistence:{
+		collection:persistenceCollection,
+		property:"email1"
+	},
 	assignee:{
-		library:"dummy/DummyMessage.js",
+		type:"module",
+		module:"dummy/DummyMessage.js",
 		method:"create"
 	},
 	options:function(){
@@ -41,9 +61,15 @@ var tasks=[
 		},this);
 	 }
  },
-	 {label:"Publish TAF",persistence_property:"email1", 
+	{
+		label:"Publish TAF",
+		persistence:{
+			collection:persistenceCollection,
+			property:"email1"
+		},
 		assignee:{
-			library:"dummy/DummyMessage.js",
+			type:"module",
+			module:"dummy/DummyMessage.js",
 			method:"publish"
 		}
 	}
@@ -59,21 +85,25 @@ var tasks=[
  db.worker_daemon_test_tasks.save({});
  */
 
-var taskCollection="worker_daemon_test_tasks";
-var persistenceCollection="worker_daemon_test_persistence";
-var auditCollection="worker_daemon_test_audit";
 
 function resetCollection(name,opts,callback){
-	 
+	console.log("Resetting "+name);
 	 db.collection(name).drop(function(err){
+	 if (err) throw err;
 		 db.createCollection(name, opts || {},function(err, cb){
 			if (err) throw err;
 			callback();
 		});	 
-	 });
-	 
-	 
-	 
+	});
+}
+
+function cleanup(){
+	db.collection(taskCollection).drop(function(err){
+		db.collection(persistenceCollection).drop(function(err){
+			db.collection(auditCollection).drop(function(err){
+			});
+		});
+	});
 }
 
 resetCollection(taskCollection,{},function(){
@@ -87,16 +117,23 @@ resetCollection(taskCollection,{},function(){
 				var persistenceColl=db.collection(persistenceCollection);
 				var obj={};
 				persistenceColl.save(obj,function(){
-					var TestWorker=new WorkerDaemon({task_collection:taskCollection,persistence_collection:persistenceColl,audit_collection:auditColl});
+					var TestWorker=new WorkerDaemon({task_collection:taskCollection,
+						audit_collection:auditColl
+						});
 					TestWorker.start();
 					taskColl=db.collection(taskCollection);
 
 					tasks.forEach(function(task){
-						task.persistence_id=obj._id;
-						TestWorker.TaskManager.create(task);
+						console.log("Creating task "+task.label);
+						TestWorker.TaskManager.create(task,function(){
+							
+							task.persistence._id=obj._id;
+							TestWorker.TaskManager.assign(task,null,function(){
+								console.log("Assigned "+task.label);
+							});
+						});
 					});
 				});
 			});
 		});
 });
-

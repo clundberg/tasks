@@ -4,11 +4,16 @@
 */
 /*
 
-label Hit the town
+label     e.g. "Generate analysis", "Pick up kids"
 
-assignee	 e.g. { type:"auto", library:"channels/DummyChannel.js", method: "process" }
+assignee	 e.g. { type:"module", 
+						  module:"channels/DummyChannel.js", 
+						  method: "process" 
+						}
 				       OR {type:"user", user_id:"5123e49a238b2800bdae905b"}
 		User or automatic system this task is assigned to
+assigned_at: TS  2013-05-01T08:06:00.147Z
+	Timestamp it was last assigned at
 
 created_at	 : TS 2013-05-01T08:06:00.147Z
 	
@@ -26,19 +31,21 @@ modified_at	 2013-05-01T08:06:00.147Z
 	Read-only. Last modification timestamp
 
 
-	
 notes	 [
 			]
 			Array of more detailed descriptions and notes about the task
 	
-persistence_id  "5123e49a238b2800bdae905b"   Optional
-		if persisting data across tasks, this identifies the object to persist with
-persistence_property  "message123", "address"
-	Create only.  Optional unique identifier to identify which element in a particular context this task applies to.
+persistence: {Object} Optional
+	{     
+		collection: <collection name>
+		_id:<id in collection> 
+		property: Optional:  <property for sub-object in main object>
+	}
+	 Used for cross task communication
 	
 filters  {
-		campaign_id:"123-a",
-		project_id:"453-a"
+		e.g. campaign_id:"123-a",
+		e.g. project_id:"453-a"
 	}
 	Create only.  Optional.  Can hold any number of attributes that can be filtered on, such as project, campaign, workspace, workflow ID's, etc.
 
@@ -63,13 +70,14 @@ var TaskManager=function(opts){
 
 
 TaskManager.prototype.load=function(task,callback){
-	if (typeof task=='object'){
+	console.log("Loading "+JSON.stringify(task));
+	if (typeof task=='object' && task._id){
 		callback(task);
 	}else{
-		this.taskCollection.findOne({_id:mongo_util.getObjectID(task)},function(err,task){
+		this.taskCollection.findOne({_id:mongo_util.getObjectID(task)},function(err,fullTask){
 			if (err) throw err;
-			if (!task) throw new Error("Could not find task "+task);
-			callback(task);
+			if (!fullTask) throw new Error("Could not find task "+task);
+			callback(fullTask);
 		});
 	}
 }
@@ -78,6 +86,7 @@ TaskManager.prototype.create=function(task,callback){
 	task.status='new';
 	task.created_at=new Date();
 	var that=this;
+	console.log("saving "+task.label);
 	that.taskCollection.save(task,function(){
 		that.auditCollection.save({ts:new Date(), task_id:task._id, status:task.status,task:task},function(err){
 				if (err) throw err;
@@ -92,6 +101,7 @@ TaskManager.prototype._update=function(task,callback){
 	this.load(task,function(task){
 		task.modified_at=new Date();
 		if (task.completed && !task.completed_at) task.completed_at=task.modified_at;
+		console.log("updating "+task.label+":" +task._id);
 		that.taskCollection.save(task,function(err){
 			if (err) throw err;
 			
@@ -106,12 +116,37 @@ TaskManager.prototype._update=function(task,callback){
 
 /* Mark a task as errored */
 TaskManager.prototype.error=function(task,message,callback){
+	task.error_stack=new Error(message).stack;
 	var that=this;
 	this.load(task,function(task){
 		task.status='error';
 		task.error_message=message;
 		that._update(task,callback);
 	}) ;
+}
+
+TaskManager.prototype.progress=function(task,progress,callback){
+	var that=this;
+	this.load(task,function(task){
+		task.progress=progress;
+		that._update(task,callback);
+	}) ;
+}
+
+
+/*
+	Assign to a particular person or item.
+	If assignee is null, just keep whatever was in the task.
+*/
+TaskManager.prototype.assign=function(task,assignee,callback){
+	var that=this;
+	this.load(task,function(task){
+		task.status='assigned';
+		if (assignee) task.assignee=assignee;
+		//if (!task.assignee) throw "Could not find assignee in "+JSON.stringify(task);
+		task.assigned_at=new Date();
+		that._update(task,callback);
+	});
 }
 
 /*
@@ -121,18 +156,8 @@ TaskManager.prototype.complete=function(task,callback){
 	var that=this;
 	this.load(task,function(task){
 		task.status='complete';
+		//completed_at will be reset by _update, so remove any old ones
 		delete task.completed_at;
-		that._update(task,callback);
-	});
-}
-
-//Assign a person to accomplish this task
-TaskManager.prototype.assign=function(task,assignee,callback){
-	var that=this;
-	this.load(task,function(task){
-		task.status='assigned';
-		task.assignee=assignee;
-		task.assignee_status='inbox';
 		that._update(task,callback);
 	});
 }

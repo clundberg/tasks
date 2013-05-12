@@ -3,7 +3,6 @@
 
 */
 var Worker=function(){
-
 }
 
 module.exports=Worker;
