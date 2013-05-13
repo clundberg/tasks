@@ -16,6 +16,11 @@ assigned_at: TS  2013-05-01T08:06:00.147Z
 	Timestamp it was last assigned at
 
 created_at	 : TS 2013-05-01T08:06:00.147Z
+
+start_after: TS 2013-05-01T08:06:00.147Z
+					OR a task_id, such as:
+				 "5123e49a238b2800bdae905b"
+		When to start this task.  Options are either a particular time, or after another task has completed, or after multiple tasks have completed
 	
 status:
 	new
@@ -70,10 +75,10 @@ var TaskManager=function(opts){
 
 
 TaskManager.prototype.load=function(task,callback){
-	console.log("Loading "+JSON.stringify(task));
 	if (typeof task=='object' && task._id){
 		callback(task);
 	}else{
+		console.log("Loading "+JSON.stringify(task));
 		this.taskCollection.findOne({_id:mongo_util.getObjectID(task)},function(err,fullTask){
 			if (err) throw err;
 			if (!fullTask) throw new Error("Could not find task "+task);
@@ -101,7 +106,6 @@ TaskManager.prototype._update=function(task,callback){
 	this.load(task,function(task){
 		task.modified_at=new Date();
 		if (task.completed && !task.completed_at) task.completed_at=task.modified_at;
-		console.log("updating "+task.label+":" +task._id);
 		that.taskCollection.save(task,function(err){
 			if (err) throw err;
 			

@@ -20,13 +20,12 @@ WorkerImpl.prototype.getFormHints=function(){
 
 WorkerImpl.prototype._update=function(task,options){
 	options=options ||{};
-	console.log("DummyMessage: this="+JSON.stringify(this));
-	console.log("DummyMessage:Options="+JSON.stringify(options));
-	console.log(task);
 	this.url="http://dummy-url/";
 	this.content=js_util.extend(this.content || {},options.content);
 	this.dummy_id=this.dummy_id || ~~(Math.random()*100000),
-	setTimeout(function(){console.log("Calling task"); task.complete();},500);
+	console.log("Dummy job working on "+task._id);
+	task.complete();
+	//setTimeout(function(){console.log("Dummy Complete."); task.complete();},2000);
 };
 
 WorkerImpl.prototype.create=function(task,options){

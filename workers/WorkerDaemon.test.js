@@ -120,18 +120,27 @@ resetCollection(taskCollection,{},function(){
 					var TestWorker=new WorkerDaemon({task_collection:taskCollection,
 						audit_collection:auditColl
 						});
-					TestWorker.start();
+					
 					taskColl=db.collection(taskCollection);
-
-					tasks.forEach(function(task){
+					var lastTaskId="";
+					async.eachSeries(tasks,function(task,cb){
 						console.log("Creating task "+task.label);
+						if (lastTaskId){
+							task.start_after_task=lastTaskId.toString();
+						}else{
+							task.start_after_timestamp=new Date();
+						}
+						
 						TestWorker.TaskManager.create(task,function(){
-							
+							lastTaskId=task._id;
 							task.persistence._id=obj._id;
 							TestWorker.TaskManager.assign(task,null,function(){
 								console.log("Assigned "+task.label);
+								cb();
 							});
 						});
+					},function(){
+						TestWorker.start();
 					});
 				});
 			});
